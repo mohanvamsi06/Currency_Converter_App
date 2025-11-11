@@ -6,7 +6,6 @@
     <string name="to_label">To</string>
     <string name="amount_label">Amount</string>
     <string name="invalid_amount_toast">Please enter a valid amount</string>
-    <string name="conversion_result_format">%.2f %s = %.2f %s</string>
     <string name="conversion_failed_toast">Conversion failed: %s</string>
     <string name="convert_button_text">Convert</string>
     <string name="usd_currency_name">USD - United States Dollar</string>
@@ -15,4 +14,6 @@
     <string name="jpy_currency_name">JPY - Japanese Yen</string>
     <string name="cad_currency_name">CAD - Canadian Dollar</string>
     <string name="selected_toast">Selected: %s</string>
+    <string name="conversion_result_title">Conversion Result</string>
+    <string name="exchange_rate_format">1 %3$s = %1$s %2$s</string>
 </resources>

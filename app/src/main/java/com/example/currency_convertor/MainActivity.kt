@@ -7,21 +7,29 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.Brightness7
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -46,22 +54,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.currency_convertor.network.RetrofitClient
 import com.example.currency_convertor.ui.theme.Currency_ConvertorTheme
 import kotlinx.coroutines.launch
+import java.text.DecimalFormat
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            Currency_ConvertorTheme {
-                App()
-            }
+            App()
         }
     }
 }
@@ -69,25 +77,27 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App() {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.currency_converter_title)) }
-            )
-        },
-        /*bottomBar = {
-            Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                Button(
-                    onClick = { /*TODO*/ },
-                    modifier = Modifier.align(Alignment.Center)
-                ) {
-                    Icon(painter = painterResource(id = R.drawable.ic_converter), contentDescription = "Converter")
-                    Text("Converter")
-                }
-            }
-        }*/
-    ) { innerPadding ->
-        SelectionScreen(modifier = Modifier.padding(innerPadding))
+    val isSystemInDarkTheme = isSystemInDarkTheme()
+    var isDarkTheme by remember { mutableStateOf(isSystemInDarkTheme) }
+
+    Currency_ConvertorTheme(darkTheme = isDarkTheme) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.currency_converter_title)) },
+                    actions = {
+                        IconButton(onClick = { isDarkTheme = !isDarkTheme }) {
+                            Icon(
+                                imageVector = if (isDarkTheme) Icons.Default.Brightness7 else Icons.Default.Brightness4,
+                                contentDescription = "Toggle theme"
+                            )
+                        }
+                    }
+                )
+            },
+        ) { innerPadding ->
+            SelectionScreen(modifier = Modifier.padding(innerPadding))
+        }
     }
 }
 
@@ -104,7 +114,7 @@ fun SelectionScreen(modifier: Modifier = Modifier) {
     var amount by remember { mutableStateOf("1000") }
     var sourceCurrency by remember { mutableStateOf("") }
     var targetCurrency by remember { mutableStateOf("") }
-    var conversionResult by remember { mutableStateOf<String?>(null) }
+    var conversionResult by remember { mutableStateOf<ConversionResultData?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
@@ -190,17 +200,16 @@ fun SelectionScreen(modifier: Modifier = Modifier) {
                             targetCode = targetCurrency.split(" ")[0]
                         )
                         val convertedAmount = amountToConvert * response.conversionRate
-                        conversionResult = context.getString(
-                            R.string.conversion_result_format,
-                            amountToConvert,
-                            sourceCurrency,
-                            convertedAmount,
-                            targetCurrency
+                        conversionResult = ConversionResultData(
+                            originalAmount = amountToConvert,
+                            convertedAmount = convertedAmount,
+                            sourceCurrency = sourceCurrency,
+                            targetCurrency = targetCurrency,
+                            exchangeRate = response.conversionRate
                         )
                     } catch (e: Exception) {
                         val errorMessage = context.getString(R.string.conversion_failed_toast, e.message)
                         showToast(context, errorMessage)
-                        conversionResult = errorMessage
                     } finally {
                         isLoading = false
                     }
@@ -218,7 +227,7 @@ fun SelectionScreen(modifier: Modifier = Modifier) {
             CircularProgressIndicator()
         } else {
             conversionResult?.let {
-                Text(text = it)
+                ConversionResultCard(it)
             }
         }
     }
@@ -270,6 +279,88 @@ fun CurrencyDropdown(
                     }
                 )
             }
+        }
+    }
+}
+
+data class ConversionResultData(
+    val originalAmount: Double,
+    val convertedAmount: Double,
+    val sourceCurrency: String,
+    val targetCurrency: String,
+    val exchangeRate: Double
+)
+
+@Composable
+fun ConversionResultCard(result: ConversionResultData) {
+    val decimalFormat = DecimalFormat("#,##0.00")
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+        ) {
+            Text(
+                text = stringResource(R.string.conversion_result_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = decimalFormat.format(result.originalAmount),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = result.sourceCurrency,
+                    fontSize = 16.sp,
+                    color = Color.Gray
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = decimalFormat.format(result.convertedAmount),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = result.targetCurrency,
+                    fontSize = 16.sp,
+                    color = Color.Gray
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = stringResource(
+                    R.string.exchange_rate_format,
+                    decimalFormat.format(result.exchangeRate),
+                    result.targetCurrency,
+                    result.sourceCurrency.split(" ")[0]
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
         }
     }
 }
