@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -63,6 +65,7 @@ import com.example.currency_convertor.network.RetrofitClient
 import com.example.currency_convertor.ui.theme.Currency_ConvertorTheme
 import kotlinx.coroutines.launch
 import java.text.DecimalFormat
+import java.util.Date
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -114,7 +117,7 @@ fun SelectionScreen(modifier: Modifier = Modifier) {
     var amount by remember { mutableStateOf("1000") }
     var sourceCurrency by remember { mutableStateOf("") }
     var targetCurrency by remember { mutableStateOf("") }
-    var conversionResult by remember { mutableStateOf<ConversionResultData?>(null) }
+    var conversionHistory by remember { mutableStateOf<List<ConversionResultData>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
@@ -193,20 +196,22 @@ fun SelectionScreen(modifier: Modifier = Modifier) {
 
                 coroutineScope.launch {
                     isLoading = true
-                    conversionResult = null
                     try {
                         val response = RetrofitClient.instance.getConversionRate(
                             baseCode = sourceCurrency.split(" ")[0],
                             targetCode = targetCurrency.split(" ")[0]
                         )
                         val convertedAmount = amountToConvert * response.conversionRate
-                        conversionResult = ConversionResultData(
+                        val newResult = ConversionResultData(
                             originalAmount = amountToConvert,
                             convertedAmount = convertedAmount,
                             sourceCurrency = sourceCurrency,
                             targetCurrency = targetCurrency,
-                            exchangeRate = response.conversionRate
+                            exchangeRate = response.conversionRate,
+                            date = Date()
                         )
+                        val updatedHistory = (listOf(newResult) + conversionHistory).take(10)
+                        conversionHistory = updatedHistory
                     } catch (e: Exception) {
                         val errorMessage = context.getString(R.string.conversion_failed_toast, e.message)
                         showToast(context, errorMessage)
@@ -225,9 +230,11 @@ fun SelectionScreen(modifier: Modifier = Modifier) {
 
         if (isLoading) {
             CircularProgressIndicator()
-        } else {
-            conversionResult?.let {
-                ConversionResultCard(it)
+        }
+
+        LazyColumn {
+            items(conversionHistory) { result ->
+                ConversionResultCard(result = result)
             }
         }
     }
@@ -288,15 +295,20 @@ data class ConversionResultData(
     val convertedAmount: Double,
     val sourceCurrency: String,
     val targetCurrency: String,
-    val exchangeRate: Double
+    val exchangeRate: Double,
+    val date: Date
 )
 
 @Composable
-fun ConversionResultCard(result: ConversionResultData) {
+fun ConversionResultCard(result: ConversionResultData, modifier: Modifier = Modifier) {
     val decimalFormat = DecimalFormat("#,##0.00")
+    val dateFormat = java.text.SimpleDateFormat.getDateTimeInstance(
+        java.text.SimpleDateFormat.SHORT,
+        java.text.SimpleDateFormat.SHORT
+    )
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(top = 16.dp),
         shape = RoundedCornerShape(8.dp),
@@ -307,12 +319,25 @@ fun ConversionResultCard(result: ConversionResultData) {
                 .padding(16.dp)
                 .fillMaxWidth()
         ) {
-            Text(
-                text = stringResource(R.string.conversion_result_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.conversion_result_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = dateFormat.format(result.date),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+            }
+
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically
